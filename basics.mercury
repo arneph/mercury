@@ -1,0 +1,259 @@
+component Nand(a, b)(r) {
+    r: nand(a, b)
+}
+
+test Nand {
+    component: Nand
+
+    expect r is 1
+
+    set a, b: 0, 0
+    expect r is 1
+
+    set a, b: 0, 1
+    expect r is 1
+    
+    set a, b: 1, 0
+    expect r is 1
+    
+    set a, b: 1, 1
+    expect r is 0
+}
+
+component Not(a)(r) {
+    r: Nand(a, a)
+}
+
+component Ident(a)(r) {
+    'a: Not(a)
+    r: Not('a)
+}
+
+component And(a, b)(r) {
+    i: Nand(a, b)
+    r: Not(i)
+}
+
+component Or(a, b)(r) {
+    'a: Not(a)
+    'b: Not(b)
+    r: Nand('a, 'b)
+}
+
+component Or3(a, b, c)(r) {
+    i: Or(a, b)
+    r: Or(i, c)
+}
+
+component Nor(a, b)(r) {
+    i: Or(a, b)
+    r: Not(i)
+}
+
+component Xor(a, b)(r) {
+    i1: Nand(a, b)
+    i2: Nand(a, i1)
+    i3: Nand(b, i1)
+    r: Nand(i2, i3)
+}
+
+test Xor {
+    component: Xor
+
+    expect r is 0
+
+    set a, b: 0, 0
+    expect r is 0
+
+    set a, b: 0, 1
+    expect r is 1
+
+    set a, b: 1, 0
+    expect r is 1
+
+    set a, b: 1, 1
+    expect r is 0
+}
+
+component Xnor(a, b)(r) {
+    orAB: Or(a, b)
+    nandAB: Nand(a, b)
+    r: Nand(a, b)
+}
+
+component Add(a, b)(r, c) {
+    r: Xor(a, b)
+    c: And(a, b)
+}
+
+test Add {
+    component: Add
+
+    expect r, c is 0, 0
+
+    set a, b: 0, 0
+    expect r, c is 0, 0
+
+    set a, b: 0, 1
+    expect r, c is 1, 0
+
+    set a, b: 1, 0
+    expect r, c is 1, 0
+
+    set a, b: 1, 1
+    expect r, c is 0, 1
+}
+
+component Add1(a, b, ci)(r, co) {
+    i1: Xor(a, b)
+    r: Xor(i1, ci)
+    i2: And(a, b)
+    i3: And(a, ci)
+    i4: And(b, ci)
+    co: Or3(i2, i3, i4)
+}
+
+test Add1 {
+    component: Add1
+
+    expect r, co is 0, 0
+
+    set a, b, ci: 0, 0, 0
+    expect r, co is 0, 0
+
+    set a, b, ci: 0, 1, 0
+    expect r, co is 1, 0
+
+    set a, b, ci: 1, 0, 0
+    expect r, co is 1, 0
+
+    set a, b, ci: 1, 1, 0
+    expect r, co is 0, 1
+
+    set a, b, ci: 0, 0, 1
+    expect r, co is 1, 0
+
+    set a, b, ci: 0, 1, 1
+    expect r, co is 0, 1
+
+    set a, b, ci: 1, 0, 1
+    expect r, co is 0, 1
+
+    set a, b, ci: 1, 1, 1
+    expect r, co is 1, 1
+}
+
+component Add64(a[64], b[64])(r[64], c) {
+    define d[64]
+    r[0], d[0]: Add(a[0], b[0])
+    for i from 1 to 63 {
+        r[i], d[i]: Add1(a[i], b[i], d[i - 1])
+    }
+    c: Ident(d[63])
+}
+
+test Add64 {
+    component: Add64
+
+    expect r, c is 0x0000000000000000, 0
+
+    set a, b: 0x0000000000000000, 0x0000000000000000
+    expect r, c is 0x0000000000000000, 0
+    
+    set a, b: 0x0000000000000000, 0x0000000000000001
+    expect r, c is 0x0000000000000001, 0
+
+    set a, b: 0x0000000000000001, 0x0000000000000000
+    expect r, c is 0x0000000000000001, 0
+
+    set a, b: 3, 5
+    expect r, c is 8, 0
+
+    set a, b: 4095, 2
+    expect r, c is 4097, 0
+
+    set a, b: 1234, 5678
+    expect r, c is 6912, 0
+}
+
+component Memory1(s, r)(q, 'q) {
+    's: Not(s)
+    'r: Not(r)
+     q: Nand('s, 'q)
+    'q: Nand('r, q)
+}
+
+test Memory1 {
+    component: Memory1
+
+    set s, r: 0, 1
+    assert q, 'q is 0, 1
+
+    set s, r: 0, 0
+    assert q, 'q is 0, 1
+
+    set s, r: 1, 0
+    assert q, 'q is 1, 0
+    
+    set s, r: 0, 0
+    assert q, 'q is 1, 0
+
+    set s, r: 1, 0
+    assert q, 'q is 1, 0
+
+    set s, r: 0, 0
+    assert q, 'q is 1, 0
+
+    set s, r: 0, 1
+    assert q, 'q is 0, 1
+
+    set s, r: 0, 0
+    assert q, 'q is 0, 1
+
+    set s, r: 0, 1
+    assert q, 'q is 0, 1
+
+    set s, r: 0, 0
+    assert q, 'q is 0, 1
+}
+
+component Memory64(s[64], r)(q[64]) {
+    define 'q[64]
+    for i from 0 to 63 {
+        q[i], 'q[i]: Memory1(s[i], r)
+    }
+}
+
+test Memory64 {
+    component: Memory64
+
+    set s, r: 0x0000000000000000, 1
+    assert q is 0x0000000000000000
+
+    set s, r: 0x0000000000000000, 0
+    assert q is 0x0000000000000000
+
+    set s, r: 0xcafebabe12345678, 0
+    assert q is 0xcafebabe12345678
+
+    set s, r: 0x0000000000000000, 0
+    assert q is 0xcafebabe12345678
+
+    set s, r: 0x0000000000000000, 1
+    assert q is 0x0000000000000000
+
+    set s, r: 0x0000000000000000, 0
+    assert q is 0x0000000000000000
+
+    set s, r: 0xabc123def4560987, 0
+    assert q is 0xabc123def4560987
+
+    set s, r: 0x0000000000000000, 0
+    assert q is 0xabc123def4560987
+
+    set s, r: 0x0000000000000000, 1
+    assert q is 0x0000000000000000
+
+    set s, r: 0x0000000000000000, 0
+    assert q is 0x0000000000000000
+}
