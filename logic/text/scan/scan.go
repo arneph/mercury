@@ -49,7 +49,7 @@ func (s *Scanner) Scan(newLineMode NewLineMode) (pos positions.Pos, tok tokens.T
 		panic(fmt.Errorf("unknown NewLineMode: %v", newLineMode))
 	}
 	pos = s.file.Pos(s.offset)
-	if s.offset == len(s.src) {
+	if s.offset >= len(s.src) {
 		return pos, tokens.EOF, ""
 	}
 	switch ch := s.src[s.offset]; ch {
@@ -137,7 +137,11 @@ func (s *Scanner) Scan(newLineMode NewLineMode) (pos positions.Pos, tok tokens.T
 			for ; i < len(s.src) && ok(s.src[i]); i++ {
 				lit += string(s.src[i])
 			}
-			tok = tokens.NUMBER
+			if hex && len(lit) < 3 {
+				tok = tokens.ERROR
+			} else {
+				tok = tokens.NUMBER
+			}
 		} else {
 			tok = tokens.ERROR
 		}
